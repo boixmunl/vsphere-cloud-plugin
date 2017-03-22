@@ -40,6 +40,11 @@ import org.kohsuke.stapler.QueryParameter;
 
 import com.vmware.vim25.mo.VirtualMachine;
 import com.vmware.vim25.mo.VirtualMachineSnapshot;
+import hudson.slaves.NodeProperty;
+import java.util.LinkedHashMap;
+import java.util.List;
+import jenkins.model.Jenkins;
+import org.jenkinsci.plugins.vsphere.VSphereGuestInfoProperty;
 
 public class Deploy extends VSphereBuildStep implements SimpleBuildStep {
 
@@ -54,20 +59,22 @@ public class Deploy extends VSphereBuildStep implements SimpleBuildStep {
   private final String folder;
   private final String customizationSpec;
   private final boolean powerOn;
+  private final List<? extends VSphereGuestInfoProperty> guestInfoProperties;
   private Integer timeoutInSeconds = new Integer(TIMEOUT_DEFAULT);
 	private String IP;
 
 	@DataBoundConstructor
 	public Deploy(String template, String clone, boolean linkedClone,
-		      String resourcePool, String cluster, String datastore, String folder, String customizationSpec, Integer timeoutInSeconds, boolean powerOn) throws VSphereException {
+		      String resourcePool, String cluster, String datastore, String folder, String customizationSpec, Integer timeoutInSeconds, boolean powerOn, List<? extends VSphereGuestInfoProperty> guestInfoProperties) throws VSphereException {
 		this.template = template;
 		this.clone = clone;
 		this.linkedClone = linkedClone;
 		this.resourcePool= (resourcePool != null) ? resourcePool : "";
 		this.cluster=cluster;
-    this.datastore=datastore;
-    this.folder=folder;
-    this.customizationSpec=customizationSpec;
+                this.datastore=datastore;
+                this.folder=folder;
+                this.customizationSpec=customizationSpec;
+                this.guestInfoProperties = guestInfoProperties;
 		this.powerOn=powerOn;
 		if(timeoutInSeconds != null){
 			this.timeoutInSeconds=timeoutInSeconds;
@@ -93,6 +100,10 @@ public class Deploy extends VSphereBuildStep implements SimpleBuildStep {
 	public String getResourcePool() {
 		return resourcePool;
 	}
+        
+    public List<? extends VSphereGuestInfoProperty> getGuestInfoProperties() {
+        return guestInfoProperties;
+    }
 
     public String getDatastore() {
         return datastore;
@@ -160,7 +171,7 @@ public class Deploy extends VSphereBuildStep implements SimpleBuildStep {
 		return null;
 	}
 
-	private boolean deployFromTemplate(final Run<?, ?> run, final Launcher launcher, final TaskListener listener) throws VSphereException {
+	private boolean deployFromTemplate(final Run<?, ?> run, final Launcher launcher, final TaskListener listener) throws VSphereException, IOException, InterruptedException {
 		PrintStream jLogger = listener.getLogger();
 		String expandedClone = clone;
 		String expandedTemplate = template;
@@ -195,6 +206,12 @@ public class Deploy extends VSphereBuildStep implements SimpleBuildStep {
         }
 
         vsphere.deployVm(expandedClone, expandedTemplate, linkedClone, resourcePoolName, expandedCluster, expandedDatastore, expandedFolder, powerOn, expandedCustomizationSpec, jLogger);
+        if (this.guestInfoProperties != null && !this.guestInfoProperties.isEmpty()) {
+            final Map<String, String> resolvedGuestInfoProperties = calculateGuestInfoProperties(expandedTemplate, listener,env);
+            if (!resolvedGuestInfoProperties.isEmpty()) {
+                vsphere.addGuestInfoVariable(expandedTemplate, resolvedGuestInfoProperties);
+            }
+        }
 		VSphereLogger.vsLogger(jLogger, "\""+expandedClone+"\" successfully deployed!");
 		if (!powerOn) {
 			return true; // don't try to obtain IP if VM isn't being turned on.
@@ -218,6 +235,50 @@ public class Deploy extends VSphereBuildStep implements SimpleBuildStep {
 			return false;
 		}
 	}
+        
+        
+        private Map<String, String> calculateGuestInfoProperties(final String cloneName, final TaskListener listener,final EnvVars env)
+            throws IOException, InterruptedException {
+        final EnvVars knownVariables = calculateVariablesForGuestInfo(cloneName, listener);
+        final Map<String, String> resolvedGuestInfoProperties = new LinkedHashMap<String, String>();
+        for (final VSphereGuestInfoProperty property : this.guestInfoProperties) {
+            final String name = property.getName();
+            final String configuredValue = property.getValue();
+            final String resolvedValue = env.expand(Util.replaceMacro(configuredValue, knownVariables));
+            resolvedGuestInfoProperties.put(name, resolvedValue);
+        }
+        return resolvedGuestInfoProperties;
+    }
+
+    private EnvVars calculateVariablesForGuestInfo(final String cloneName, final TaskListener listener)
+            throws IOException, InterruptedException {
+        final EnvVars knownVariables = new EnvVars();
+        // Maintenance note: If you update this method, you must also update the
+        // UI help page to match.
+        final String jenkinsUrl = Jenkins.getActiveInstance().getRootUrl();
+        if (jenkinsUrl != null) {
+            addEnvVar(knownVariables, "JENKINS_URL", jenkinsUrl);
+            addEnvVar(knownVariables, "HUDSON_URL", jenkinsUrl);
+        }
+        addEnvVars(knownVariables, listener, Jenkins.getInstance().getGlobalNodeProperties());
+        addEnvVar(knownVariables, "NODE_NAME", cloneName);
+        addEnvVar(knownVariables, "cluster", this.cluster);
+        addEnvVar(knownVariables, "datastore", this.datastore);
+
+        return knownVariables;
+    }
+
+    private static void addEnvVars(final EnvVars vars, final TaskListener listener, final Iterable<? extends NodeProperty<?>> nodeProperties) throws IOException, InterruptedException {
+        if (nodeProperties != null) {
+            for (final NodeProperty<?> nodeProperty : nodeProperties) {
+                nodeProperty.buildEnvVars(vars, listener);
+            }
+        }
+    }
+
+    private static void addEnvVar(final EnvVars vars, final String name, final Object valueOrNull) {
+        vars.put(name, valueOrNull == null ? "" : valueOrNull.toString());
+    }
 
 	@Extension
 	public static final class DeployDescriptor extends VSphereBuildStepDescriptor {

@@ -36,6 +36,12 @@ import org.kohsuke.stapler.QueryParameter;
 
 import com.vmware.vim25.mo.VirtualMachine;
 import com.vmware.vim25.mo.VirtualMachineSnapshot;
+import hudson.slaves.NodeProperty;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import jenkins.model.Jenkins;
+import org.jenkinsci.plugins.vsphere.VSphereGuestInfoProperty;
 
 public class Clone extends VSphereBuildStep {
 
@@ -50,13 +56,14 @@ public class Clone extends VSphereBuildStep {
     private final String folder;
     private final String customizationSpec;
     private final boolean powerOn;
+    private final List<? extends VSphereGuestInfoProperty> guestInfoProperties;
     private Integer timeoutInSeconds = new Integer(TIMEOUT_DEFAULT);
     private String IP;
 
     @DataBoundConstructor
     public Clone(String sourceName, String clone, boolean linkedClone,
                  String resourcePool, String cluster, String datastore, String folder,
-                 boolean powerOn, Integer timeoutInSeconds, String customizationSpec) throws VSphereException {
+                 boolean powerOn, Integer timeoutInSeconds, String customizationSpec, final List<? extends VSphereGuestInfoProperty> guestInfoProperties) throws VSphereException {
         this.sourceName = sourceName;
         this.clone = clone;
         this.linkedClone = linkedClone;
@@ -66,12 +73,17 @@ public class Clone extends VSphereBuildStep {
         this.folder=folder;
         this.customizationSpec=customizationSpec;
         this.powerOn=powerOn;
+        this.guestInfoProperties = guestInfoProperties;
         if(timeoutInSeconds != null){
           this.timeoutInSeconds=timeoutInSeconds;
         }
 
     }
 
+    public List<? extends VSphereGuestInfoProperty> getGuestInfoProperties() {
+        return guestInfoProperties;
+    }
+    
     public String getSourceName() {
         return sourceName;
     }
@@ -138,7 +150,7 @@ public class Clone extends VSphereBuildStep {
         //TODO throw AbortException instead of returning value
     }
 
-    private boolean cloneFromSource(final Run<?, ?> run, final Launcher launcher, final TaskListener listener) throws VSphereException {
+    private boolean cloneFromSource(final Run<?, ?> run, final Launcher launcher, final TaskListener listener) throws VSphereException, IOException, InterruptedException {
         PrintStream jLogger = listener.getLogger();
         String expandedClone = clone;
         String expandedSource = sourceName;
@@ -166,6 +178,14 @@ public class Clone extends VSphereBuildStep {
         }
         vsphere.cloneVm(expandedClone, expandedSource, linkedClone, expandedResourcePool, expandedCluster,
                 expandedDatastore, expandedFolder, powerOn, expandedCustomizationSpec, jLogger);
+        
+        if (this.guestInfoProperties != null && !this.guestInfoProperties.isEmpty()) {
+            final Map<String, String> resolvedGuestInfoProperties = calculateGuestInfoProperties(expandedClone, listener, env);
+            if (!resolvedGuestInfoProperties.isEmpty()) {
+                vsphere.addGuestInfoVariable(expandedClone, resolvedGuestInfoProperties);
+            }
+        }
+        
         if (powerOn) {
             VSphereLogger.vsLogger(jLogger, "Trying to get the IP-Address of \""+expandedClone+"\" for the next "+timeoutInSeconds+" seconds.");
             IP = vsphere.getIp(vsphere.getVmByName(expandedClone), timeoutInSeconds);
@@ -174,6 +194,54 @@ public class Clone extends VSphereBuildStep {
 
         return true;
     }
+    
+    
+        private Map<String, String> calculateGuestInfoProperties(final String cloneName, final TaskListener listener, EnvVars env)
+            throws IOException, InterruptedException {
+        final EnvVars knownVariables = calculateVariablesForGuestInfo(cloneName, listener);
+        final Map<String, String> resolvedGuestInfoProperties = new LinkedHashMap<String, String>();
+        for (final VSphereGuestInfoProperty property : this.guestInfoProperties) {
+            final String name = property.getName();
+            final String configuredValue = property.getValue();
+            final String resolvedValue = env.expand(Util.replaceMacro(configuredValue, knownVariables));
+            resolvedGuestInfoProperties.put(name, resolvedValue);
+        }
+        return resolvedGuestInfoProperties;
+    }
+        
+        
+        private EnvVars calculateVariablesForGuestInfo(final String cloneName, final TaskListener listener)
+            throws IOException, InterruptedException {
+        final EnvVars knownVariables = new EnvVars();
+
+        // Maintenance note: If you update this method, you must also update the
+        // UI help page to match.
+        final String jenkinsUrl = Jenkins.getActiveInstance().getRootUrl();
+        if (jenkinsUrl != null) {
+            addEnvVar(knownVariables, "JENKINS_URL", jenkinsUrl);
+            addEnvVar(knownVariables, "HUDSON_URL", jenkinsUrl);
+        }
+        addEnvVars(knownVariables, listener, Jenkins.getInstance().getGlobalNodeProperties());
+        addEnvVar(knownVariables, "NODE_NAME", cloneName);
+        addEnvVar(knownVariables, "cluster", this.cluster);
+        addEnvVar(knownVariables, "datastore", this.datastore);
+
+        return knownVariables;
+    }
+        
+        
+    private static void addEnvVars(final EnvVars vars, final TaskListener listener, final Iterable<? extends NodeProperty<?>> nodeProperties) throws IOException, InterruptedException {
+        if (nodeProperties != null) {
+            for (final NodeProperty<?> nodeProperty : nodeProperties) {
+                nodeProperty.buildEnvVars(vars, listener);
+            }
+        }
+    }
+
+    private static void addEnvVar(final EnvVars vars, final String name, final Object valueOrNull) {
+        vars.put(name, valueOrNull == null ? "" : valueOrNull.toString());
+    }
+            
 
     @Extension
     public static final class CloneDescriptor extends VSphereBuildStepDescriptor {
