@@ -56,7 +56,7 @@ public class vSphereCloudLauncher extends DelegatingComputerLauncher {
     @DataBoundConstructor
     public vSphereCloudLauncher(ComputerLauncher launcher,
             String vsDescription, String vmName,
-            Boolean overrideLaunchSupported, Boolean waitForVMTools,
+            Boolean overrideLaunchSupported, Boolean waitForVMTools, Boolean shutDownVMBeforeStart,
             String snapName, String launchDelay, String idleOption,
             String LimitedTestRunCount) {
         super(launcher);

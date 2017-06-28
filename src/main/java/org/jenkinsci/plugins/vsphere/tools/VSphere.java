@@ -625,6 +625,22 @@ public class VSphere {
             }
             return count;
         }
+        
+        public List<VirtualMachine> getVmByPrefix(String vmPrefix) throws VSphereException {
+            List<VirtualMachine> vm = new ArrayList<>();
+            try {
+                final InventoryNavigator navigator = new InventoryNavigator(getServiceInstance().getRootFolder());
+                final ManagedEntity[] entities = navigator.searchManagedEntities(true);
+                for(final ManagedEntity entity : entities) {
+                    if(entity.getName().startsWith(vmPrefix)) {
+                        vm.add((VirtualMachine) entity);
+                    }
+                }
+                return vm;
+            } catch (Exception e) {
+                    throw new VSphereException(e);
+            }
+	}
 
     private Datastore getDatastoreByName(final String datastoreName, ManagedEntity rootEntity) throws RemoteException, MalformedURLException {
         if (rootEntity == null) {
@@ -776,36 +792,36 @@ public class VSphere {
 	 * @param failOnNoExist If true and the VM does not exist then a VSphereException will be thrown.
 	 * @throws VSphereException If an error occurred.
 	 */
-	public void destroyVm(String name, boolean failOnNoExist) throws VSphereException{
-		try{
-			VirtualMachine vm = getVmByName(name);
-			if(vm==null){
-				if(failOnNoExist) throw new VSphereException("VM \"" + name + "\" does not exist");
+	public void destroyVm(String name, boolean failOnNoExist) throws VSphereException {
+            try {
+                VirtualMachine vm = getVmByName(name);
+                if (vm == null) {
+                    if (failOnNoExist) {
+                        throw new VSphereException("VM \"" + name + "\" does not exist");
+                    }
 
-				LOGGER.log(Level.FINER, "VM \"" + name + "\" does not exist, or already deleted!");
-				return;
-			}
+                    LOGGER.log(Level.FINER, "VM \"" + name + "\" does not exist, or already deleted!");
+                    return;
+                }
 
+                if (!vm.getConfig().template) {
+                    powerOffVm(vm, true, false);
+                }
 
-			if(!vm.getConfig().template) {
-                powerOffVm(vm, true, false);
+                final Task task = vm.destroy_Task();
+                String status = task.waitForTask();
+                if (status.equals(Task.SUCCESS)) {
+                    LOGGER.log(Level.FINER, "VM \"" + name + "\" was deleted successfully.");
+                    return;
+                }
+                throw newVSphereException(task.getTaskInfo(), "Could not delete VM \"" + name + "\"!");
+
+            } catch (RuntimeException | VSphereException e) {
+                throw e;
+            } catch (Exception e) {
+                throw new VSphereException(e.getMessage(), e);
             }
-
-			final Task task = vm.destroy_Task();
-			String status = task.waitForTask();
-			if(status.equals(Task.SUCCESS))
-			{
-				LOGGER.log(Level.FINER, "VM \"" + name + "\" was deleted successfully.");
-				return;
-			}
-			throw newVSphereException(task.getTaskInfo(), "Could not delete VM \""+ name +"\"!");
-
-		} catch(RuntimeException | VSphereException e){
-			throw e;
-		}catch(Exception e){
-			throw new VSphereException(e.getMessage(), e);
-		}
-	}
+        }
 
     /**
      * Renames a VM Snapshot
