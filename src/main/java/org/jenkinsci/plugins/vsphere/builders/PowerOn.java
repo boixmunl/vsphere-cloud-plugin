@@ -72,7 +72,15 @@ public class PowerOn extends VSphereBuildStep {
 	public boolean perform(final AbstractBuild<?, ?> build, Launcher launcher, final BuildListener listener) {
 		boolean retVal = false;
 		try {
+                    for (int i = 0; i < retries; i++) {
 			retVal = powerOn(build, launcher, listener);
+                        if(retVal){
+                            break;
+                        }
+                        waitForAttemp();
+                    }if(!retVal){
+                        retVal = powerOn(build, launcher, listener);
+                    }
 		} catch (Exception e) {
 			e.printStackTrace();
 		}

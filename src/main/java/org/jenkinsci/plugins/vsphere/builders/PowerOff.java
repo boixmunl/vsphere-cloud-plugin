@@ -86,7 +86,15 @@ public class PowerOff extends VSphereBuildStep implements SimpleBuildStep {
 	public boolean perform(final AbstractBuild<?, ?> build, Launcher launcher, final BuildListener listener) {
 		boolean retVal = false;
 		try {
+                    for (int i = 0; i < retries; i++) {
 			retVal = powerOff(build, launcher, listener);
+                        if(retVal){
+                            break;
+                        }
+                        waitForAttemp();
+                    }if(!retVal){
+                        retVal = powerOff(build, launcher, listener);
+                    }
 		} catch (VSphereException e) {
 			e.printStackTrace();
 		}

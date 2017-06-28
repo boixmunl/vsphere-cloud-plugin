@@ -72,11 +72,24 @@ public class Delete extends VSphereBuildStep {
 	public boolean perform(final AbstractBuild<?, ?> build, final Launcher launcher, final BuildListener listener)  {
 		boolean retVal = false;
 		try {
-			if(allowDelete()) {
+                    for (int i = 0; i < retries; i++) {
+                        if(allowDelete()) {
 				retVal = killVm(build, launcher, listener);
 			} else {
 				VSphereLogger.vsLogger(listener.getLogger(), "Deletion is disabled!");
 			}
+                        if(retVal){
+                            break;
+                        }
+                        waitForAttemp();
+                    }
+                    if(!retVal){
+                        if(allowDelete()) {
+				retVal = killVm(build, launcher, listener);
+			} else {
+				VSphereLogger.vsLogger(listener.getLogger(), "Deletion is disabled!");
+			}
+                    }
 		} catch (Exception e) {
 			e.printStackTrace();
 		}

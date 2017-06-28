@@ -82,7 +82,15 @@ public class TakeSnapshot extends VSphereBuildStep implements SimpleBuildStep {
 	public boolean perform(final AbstractBuild<?, ?> build, Launcher launcher, final BuildListener listener)  {
 		boolean retVal = false;
 		try {
-			return takeSnapshot(build, launcher, listener);
+                    for (int i = 0; i < retries; i++) {
+			retVal = takeSnapshot(build, launcher, listener);
+                        if(retVal){
+                            break;
+                        }
+                        waitForAttemp();
+                    }if(!retVal){
+                        retVal = takeSnapshot(build, launcher, listener);
+                    }
 		} catch (Exception e) {
 			e.printStackTrace();
 		}

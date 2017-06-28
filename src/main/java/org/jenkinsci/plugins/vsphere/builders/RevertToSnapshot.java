@@ -73,7 +73,15 @@ public class RevertToSnapshot extends VSphereBuildStep implements SimpleBuildSte
 	public boolean perform(final AbstractBuild<?, ?> build, Launcher launcher, final BuildListener listener) {
 		boolean retVal = false;
 		try {
+                    for (int i = 0; i < retries; i++) {
 			retVal = revertToSnapshot(build, launcher, listener);
+                        if(retVal){
+                            break;
+                        }
+                        waitForAttemp();
+                    }if(!retVal){
+                        retVal = revertToSnapshot(build, launcher, listener);
+                    }
 		} catch (Exception e) {
 			e.printStackTrace();
 		}

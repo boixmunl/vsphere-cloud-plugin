@@ -64,7 +64,15 @@ public class SuspendVm extends VSphereBuildStep implements SimpleBuildStep {
 	public boolean perform(final AbstractBuild<?, ?> build, final Launcher launcher, final BuildListener listener)  {
 		boolean retVal = false;
 		try {
+                    for (int i = 0; i < retries; i++) {
 			retVal = suspend(build, launcher, listener);
+                        if(retVal){
+                            break;
+                        }
+                        waitForAttemp();
+                    }if(!retVal){
+                        retVal = suspend(build, launcher, listener);
+                    }
 		} catch (Exception e) {
 			e.printStackTrace();
 		}

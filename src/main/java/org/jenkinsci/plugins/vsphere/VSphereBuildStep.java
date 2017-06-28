@@ -28,6 +28,9 @@ import org.jenkinsci.plugins.vsphere.tools.VSphereException;
 
 import javax.annotation.Nonnull;
 import java.io.IOException;
+import java.util.concurrent.TimeUnit;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Define a base class for all vSphere build steps.  All vSphere build steps should extend 
@@ -36,6 +39,16 @@ import java.io.IOException;
 public abstract class VSphereBuildStep implements Describable<VSphereBuildStep>, ExtensionPoint {
 
 	protected VSphere vsphere;
+        protected int retries = 3;
+        
+        public void waitForAttemp(){
+            int time=10;
+            try {
+                TimeUnit.SECONDS.sleep(time);
+            } catch (InterruptedException ex) {
+                Logger.getLogger(VSphereBuildStep.class.getName()).log(Level.SEVERE, null, ex);
+            }
+        }
 
 	public VSphere getVsphere() {
 		return vsphere;
