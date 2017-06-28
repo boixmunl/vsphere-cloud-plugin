@@ -2,6 +2,7 @@ package org.jenkinsci.plugins.vsphere.tools;
 
 import java.math.BigInteger;
 import java.util.Collection;
+import java.util.Date;
 import java.util.Iterator;
 import java.util.Set;
 import java.util.SortedSet;
@@ -65,14 +66,14 @@ public final class CloudProvisioningAlgorithm {
         final vSphereCloudSlaveTemplate template = record.getTemplate();
         final String cloneNamePrefix = template.getCloneNamePrefix();
         final Set<String> existingNames = new TreeSet<String>();
+        
         existingNames.addAll(record.getCurrentlyPlanned());
         existingNames.addAll(record.getCurrentlyProvisioned());
-        final int templateInstanceCap = template.getTemplateInstanceCap();
-        final boolean hasCap = templateInstanceCap > 0 && templateInstanceCap < Integer.MAX_VALUE;
-        final int maxAttempts = hasCap ? (templateInstanceCap + 1) : 100;
+        final int maxAttempts = 100;
+        
         for (int attempt = 0; attempt < maxAttempts; attempt++) {
-            final String suffix = hasCap ? calcSequentialSuffix(attempt) : calcRandomSuffix(attempt);
-            final String nodeName = cloneNamePrefix + "_" + suffix;
+            Date date = new Date();
+            final String nodeName = cloneNamePrefix + "_" + System.currentTimeMillis();
             if (!existingNames.contains(nodeName)) {
                 return nodeName;
             }
