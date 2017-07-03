@@ -1,0 +1,18 @@
+<j:jelly xmlns:j="jelly:core" xmlns:st="jelly:stapler" xmlns:d="jelly:define" xmlns:l="/lib/layout" xmlns:t="/lib/hudson" xmlns:f="/lib/form">
+	<f:entry title="${%VM}" field="vm">
+      <f:textbox  />
+    </f:entry>
+    
+    <f:entry title="${%Annotation}">
+            <table width="100%">
+                <f:entry title="${%Name}" field="name">
+                    <f:textbox/>
+                </f:entry>
+                <f:entry title="${%Value}" field="value">
+                    <f:textbox/>
+                </f:entry>
+            </table>
+    </f:entry>
+
+	<f:validateButton title="${%Check Data}" progress="${%Testing...}" method="testData" with="serverName,vm"/>
+</j:jelly>

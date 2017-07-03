@@ -127,11 +127,7 @@ public class Clone extends VSphereBuildStep {
     @Override
     public void perform(@Nonnull Run<?, ?> run, @Nonnull FilePath filePath, @Nonnull Launcher launcher, @Nonnull TaskListener listener) throws InterruptedException, IOException {
         try {
-            for (int i = 0; i < retries; i++) {
-                if(cloneFromSource(run, launcher, listener)){
-                    break;
-                }
-            }
+            cloneFromSource(run, launcher, listener);
         } catch (Exception e) {
             throw new AbortException(e.getMessage());
         }

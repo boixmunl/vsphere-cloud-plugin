@@ -1115,4 +1115,8 @@ public class VSphere {
             return new VSphereException(combinedMsg);
         }
     }
+
+    public void addAnotation() {
+        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    }
 }
