@@ -70,6 +70,8 @@ import com.cloudbees.plugins.credentials.common.StandardUsernameCredentials;
 import com.cloudbees.plugins.credentials.common.StandardUsernameListBoxModel;
 import com.cloudbees.plugins.credentials.domains.SchemeRequirement;
 import com.vmware.vim25.mo.VirtualMachine;
+import net.sf.json.JSONObject;
+import org.kohsuke.stapler.StaplerRequest;
 
 /**
  *
@@ -99,6 +101,7 @@ public class vSphereCloudSlaveTemplate implements Describable<vSphereCloudSlaveT
     private final Mode mode;
     private final boolean forceVMLaunch;
     private final boolean waitForVMTools;
+    private final boolean shutDownVMBeforeStart;
     private final int launchDelay;
     private final int limitedRunCount;
     private final boolean saveFailure;
@@ -137,6 +140,7 @@ public class vSphereCloudSlaveTemplate implements Describable<vSphereCloudSlaveT
                                      final Mode mode,
                                      final boolean forceVMLaunch,
                                      final boolean waitForVMTools,
+                                     final boolean shutDownVMBeforeStart,
                                      final int launchDelay,
                                      final int limitedRunCount,
                                      final boolean saveFailure,
@@ -165,6 +169,7 @@ public class vSphereCloudSlaveTemplate implements Describable<vSphereCloudSlaveT
         this.mode = mode;
         this.forceVMLaunch = forceVMLaunch;
         this.waitForVMTools = waitForVMTools;
+        this.shutDownVMBeforeStart = shutDownVMBeforeStart;
         this.launchDelay = launchDelay;
         this.limitedRunCount = limitedRunCount;
         this.saveFailure = saveFailure;
@@ -251,6 +256,10 @@ public class vSphereCloudSlaveTemplate implements Describable<vSphereCloudSlaveT
 
     public boolean getWaitForVMTools() {
         return this.waitForVMTools;
+    }
+    
+    public boolean getShutDownVMBeforeStart() {
+        return this.shutDownVMBeforeStart;
     }
 
     public int getLaunchDelay() {
@@ -383,7 +392,7 @@ public class vSphereCloudSlaveTemplate implements Describable<vSphereCloudSlaveT
             final ComputerLauncher configuredLauncher = determineLauncher(vSphere, cloneName);
             final RetentionStrategy<?> configuredStrategy = determineRetention();
             final String snapshotNameForLauncher = ""; /* we don't make the launcher do anything with snapshots because our clone won't be created with any */
-            slave = new vSphereCloudProvisionedSlave(cloneName, this.templateDescription, this.remoteFS, String.valueOf(this.numberOfExecutors), this.mode, this.labelString, configuredLauncher, configuredStrategy, this.nodeProperties, this.parent.getVsDescription(), cloneName, this.forceVMLaunch, this.waitForVMTools, snapshotNameForLauncher, String.valueOf(this.launchDelay), null, String.valueOf(this.limitedRunCount));
+            slave = new vSphereCloudProvisionedSlave(cloneName, this.templateDescription, this.remoteFS, String.valueOf(this.numberOfExecutors), this.mode, this.labelString, configuredLauncher, configuredStrategy, this.nodeProperties, this.parent.getVsDescription(), cloneName, this.forceVMLaunch, this.waitForVMTools, this.shutDownVMBeforeStart, snapshotNameForLauncher, String.valueOf(this.launchDelay), null, String.valueOf(this.limitedRunCount));
         } finally {
             // if anything went wrong, try to tidy up
             if( slave==null ) {
@@ -429,11 +438,37 @@ public class vSphereCloudSlaveTemplate implements Describable<vSphereCloudSlaveT
 
     @Extension
     public static final class DescriptorImpl extends Descriptor<vSphereCloudSlaveTemplate> {
+        
+        private boolean shutDownVMBeforeStart;
+        private String cloneNamePrefix;
+        
+        public DescriptorImpl(){
+            load();
+        }
+        
         @Override
         public String getDisplayName() {
             return null;
         }
 
+        public boolean getShutDownVMBeforeStart(){
+            return true;
+            //return shutDownVMBeforeStart;
+        }
+        public String getCloneNamePrefix(){
+            return "prova123";
+            //return cloneNamePrefix;
+        }
+        
+        
+        @Override
+        public boolean configure(StaplerRequest staplerRequest, JSONObject json) throws FormException {
+            shutDownVMBeforeStart= json.getBoolean("shutDownVMBeforeStart");
+            cloneNamePrefix = "pimpam";//json.getString("cloneNamePrefix");
+            save();
+            return true;
+        }
+        
         public FormValidation doCheckCloneNamePrefix(@QueryParameter String cloneNamePrefix) {
             return FormValidation.validateRequired(cloneNamePrefix);
         }

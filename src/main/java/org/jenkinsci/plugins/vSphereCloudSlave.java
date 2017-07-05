@@ -67,13 +67,13 @@ public class vSphereCloudSlave extends AbstractCloudSlave {
             RetentionStrategy retentionStrategy,
             List<? extends NodeProperty<?>> nodeProperties,
             String vsDescription, String vmName,
-            boolean launchSupportForced, boolean waitForVMTools,
+            boolean launchSupportForced, boolean waitForVMTools, boolean shutDownVMBeforeStart,
             String snapName, String launchDelay, String idleOption,
             String LimitedTestRunCount)
             throws FormException, IOException {
         super(name, nodeDescription, remoteFS, numExecutors, mode, labelString,
               new vSphereCloudLauncher(delegateLauncher, vsDescription, vmName,
-                  launchSupportForced, waitForVMTools, snapName, launchDelay,
+                  launchSupportForced, waitForVMTools, shutDownVMBeforeStart, snapName, launchDelay,
                   idleOption, LimitedTestRunCount),
               retentionStrategy, nodeProperties);
         this.vsDescription = vsDescription;

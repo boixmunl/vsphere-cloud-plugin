@@ -7,7 +7,11 @@ package org.jenkinsci.plugins;
 import com.cloudbees.hudson.plugins.folder.AbstractFolderProperty;
 import com.cloudbees.hudson.plugins.folder.AbstractFolderPropertyDescriptor;
 import com.cloudbees.hudson.plugins.folder.Folder;
+import com.vmware.vim25.mo.VirtualMachine;
 import hudson.Extension;
+import hudson.init.InitMilestone;
+import static hudson.init.InitMilestone.JOB_LOADED;
+import hudson.init.Initializer;
 import hudson.model.*;
 import hudson.model.Descriptor.FormException;
 import hudson.slaves.Cloud;
@@ -40,6 +44,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.Future;
 import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * @author Admin
@@ -159,6 +164,7 @@ public class vSphereCloud extends Cloud {
         } catch (IOException ioex) {
             //do nothing;
         }
+        shutDownVMifAny();
         Log("STARTING VSPHERE CLOUD");
     }
 
@@ -306,6 +312,7 @@ public class vSphereCloud extends Cloud {
 
     @Override
     public Collection<PlannedNode> provision(final Label label, int excessWorkload) {
+
         final String methodCallDescription = "provision(" + label + "," + excessWorkload + ")";
         try {
             int excessWorkloadSoFar = excessWorkload;
@@ -586,11 +593,24 @@ public class vSphereCloud extends Cloud {
         private
         @Deprecated
         int maxOnlineSlaves;
+        
+        private String vsDescription;
 
         @Override
         public String getDisplayName() {
             return "vSphere Cloud";
         }
+        
+        public String getUsername(){
+            return username;
+        }
+        
+        public String getVsDescription(){
+            return vsDescription;
+        }
+                
+        
+        //public 
 
         @Override
         public boolean configure(StaplerRequest req, JSONObject o)
@@ -599,8 +619,10 @@ public class vSphereCloud extends Cloud {
             username = o.getString("username");
             password = o.getString("password");
             maxOnlineSlaves = o.getInt("maxOnlineSlaves");
+            vsDescription=o.getString("vsDescription");
             save();
-            return super.configure(req, o);
+            return true;
+            //return super.configure(req, o);
         }
 
         /**
@@ -655,6 +677,21 @@ public class vSphereCloud extends Cloud {
 
         public FormValidation doCheckInstanceCap(@QueryParameter String instanceCap) {
             return FormValidation.validateNonNegativeInteger(instanceCap);
+        }
+    }
+    
+    public void shutDownVMifAny(){
+        try {
+            for (int i = 0; i < templates.size(); i++) {
+                if (templates.get(i).getShutDownVMBeforeStart()){
+                    List<VirtualMachine> vMs = vSphereInstance().getVmByPrefix(templates.get(i).getCloneNamePrefix());
+                        for (int j = 0; j < vMs.size(); j++) {
+                            vSphereInstance().destroyVm(vMs.get(j).getName(), true);
+                        }
+                    }
+                }
+        } catch (VSphereException ex) {
+            Logger.getLogger(vSphereCloud.class.getName()).log(Level.SEVERE, null, ex);
         }
     }
 }

@@ -68,6 +68,10 @@
         <f:entry title="${%Wait for VMTools}" field="waitForVMTools">
             <f:checkbox/>
         </f:entry>
+        
+        <f:entry title="${%Destroy VM's after start Jenkins}" field="shutDownVMBeforeStart" help="${%If enabled, VM linked to this template will be destroyed after start Jenkins to avoid conflicts.}">
+            <f:checkbox/>
+        </f:entry>
 
         <f:entry title="${%Delay between launch and boot complete}" field="launchDelay" description="${%Number of seconds.}">
             <f:textbox clazz="required number" default="60"/>

@@ -40,8 +40,8 @@ public class vSphereCloudProvisionedSlave extends vSphereCloudSlave {
             List<? extends NodeProperty<?>> nodeProperties,
             String vsDescription, String vmName,
             boolean launchSupportForced, boolean waitForVMTools,
-            String snapName, String launchDelay, String idleOption,
-            String LimitedTestRunCount)
+            boolean shutDownVMBeforeStart, String snapName, String launchDelay,
+            String idleOption, String LimitedTestRunCount)
             throws FormException, IOException {
         super(name, nodeDescription,
               remoteFS, numExecutors,
@@ -49,7 +49,7 @@ public class vSphereCloudProvisionedSlave extends vSphereCloudSlave {
               delegateLauncher, retentionStrategy,
               nodeProperties, vsDescription,
               vmName, launchSupportForced,
-              waitForVMTools, snapName,
+              waitForVMTools, shutDownVMBeforeStart, snapName,
               launchDelay, idleOption,
               LimitedTestRunCount);
     }
