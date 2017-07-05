@@ -1116,7 +1116,9 @@ public class VSphere {
         }
     }
 
-    public void addAnotation() {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    public void addAnotation(String vm,String annotation) throws VSphereException {
+        VirtualMachineConfigSpec vmConfigSpec = new VirtualMachineConfigSpec();
+        vmConfigSpec.setAnnotation(annotation);
+        reconfigureVm(vm, vmConfigSpec);
     }
 }

@@ -17,6 +17,7 @@ package org.jenkinsci.plugins.vsphere.builders;
 
 import com.vmware.vim25.mo.VirtualMachine;
 import hudson.AbortException;
+import hudson.EnvVars;
 import hudson.Extension;
 import hudson.FilePath;
 import hudson.Launcher;
@@ -26,6 +27,7 @@ import hudson.model.Run;
 import hudson.model.TaskListener;
 import hudson.util.FormValidation;
 import java.io.IOException;
+import java.io.PrintStream;
 import java.util.List;
 import javax.annotation.Nonnull;
 import javax.servlet.ServletException;
@@ -34,6 +36,7 @@ import static org.jenkinsci.plugins.vsphere.VSphereBuildStep.VSphereBuildStepDes
 import org.jenkinsci.plugins.vsphere.VSphereGuestInfoProperty;
 import org.jenkinsci.plugins.vsphere.tools.VSphere;
 import org.jenkinsci.plugins.vsphere.tools.VSphereException;
+import org.jenkinsci.plugins.vsphere.tools.VSphereLogger;
 import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.QueryParameter;
 
@@ -43,26 +46,20 @@ import org.kohsuke.stapler.QueryParameter;
  */
 public class AddAnnotation extends VSphereBuildStep{
     private final String vm;
-    private final String name;
-    private final String value;
+    private final String annotation;
     
     @DataBoundConstructor
-    public AddAnnotation(String vm, String name, String value) throws VSphereException {
+    public AddAnnotation(String vm, String annotation) throws VSphereException {
         this.vm=vm;
-        this.name=name;
-        this.value=value;
+        this.annotation=annotation;
     }
     
     public String getVm() {
         return vm;
     }
     
-    public String getName() {
-        return name;
-    }
-    
-    public String getValue() {
-        return value;
+    public String getAnnotation() {
+        return annotation;
     }
     
     @Override
@@ -94,8 +91,29 @@ public class AddAnnotation extends VSphereBuildStep{
         return retVal;
     }
 
-    private boolean addAnotation(final Run<?, ?> run, final Launcher launcher, final TaskListener listener) {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    private boolean addAnotation(final Run<?, ?> run, final Launcher launcher, final TaskListener listener) throws VSphereException {
+        PrintStream jLogger = listener.getLogger();
+        String expandedVm = vm;
+        String expandedAnnotation = annotation;
+        EnvVars env;
+        try {
+            env = run.getEnvironment(listener);
+        } catch (Exception e) {
+            throw new VSphereException(e);
+        }
+        if (run instanceof AbstractBuild) {
+            env.overrideAll(((AbstractBuild)run).getBuildVariables()); // Add in matrix axes..
+            expandedVm = env.expand(vm);
+            expandedAnnotation=env.expand(annotation);
+        }
+        VSphereLogger.vsLogger(jLogger, "Adding annotation of VM \"" + expandedVm + "\" Annotation \"" + expandedAnnotation + "\". Please wait ...");
+        try {
+            vsphere.addAnotation(expandedVm, expandedAnnotation);
+        } catch (Exception e) {
+            throw new VSphereException(e);
+        }
+        VSphereLogger.vsLogger(jLogger, "Annotation added!");
+        return true;
     }
     @Extension
 	public static final class AddAnnotationDescriptor extends VSphereBuildStepDescriptor {
@@ -118,24 +136,22 @@ public class AddAnnotation extends VSphereBuildStep{
 		}
 
 		public FormValidation doTestData(@QueryParameter String serverName,
-				@QueryParameter String vm) {
+				@QueryParameter String vm, @QueryParameter String annotation) {
 			try {
 
-				if (serverName.length() == 0 || vm.length()==0 )
+                            if (serverName.length() == 0 || vm.length()==0 )
 					return FormValidation.error(Messages.validation_requiredValues());
-
-				VSphere vsphere = getVSphereCloudByName(serverName, null).vSphereInstance();
 
 				if (vm.indexOf('$') >= 0)
 					return FormValidation.warning(Messages.validation_buildParameter("VM"));
 
-				VirtualMachine vmObj = vsphere.getVmByName(vm);
-				if (vmObj == null)
+				VSphere vsphere = getVSphereCloudByName(serverName, null).vSphereInstance();
+				if (vsphere.getVmByName(vm) == null)
 					return FormValidation.error(Messages.validation_notFound("VM"));
-
-				if (vmObj.getConfig().template)
+                           
+				if (vsphere.getVmByName(vm).getConfig().template)
 					return FormValidation.error(Messages.validation_notActually("VM"));
-
+                            
 				return FormValidation.ok(Messages.validation_success());
 			} catch (Exception e) {
 				throw new RuntimeException(e);
