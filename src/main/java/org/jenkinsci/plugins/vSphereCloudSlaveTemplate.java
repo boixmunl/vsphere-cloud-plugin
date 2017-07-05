@@ -452,12 +452,10 @@ public class vSphereCloudSlaveTemplate implements Describable<vSphereCloudSlaveT
         }
 
         public boolean getShutDownVMBeforeStart(){
-            return true;
-            //return shutDownVMBeforeStart;
+            return shutDownVMBeforeStart;
         }
         public String getCloneNamePrefix(){
-            return "prova123";
-            //return cloneNamePrefix;
+            return cloneNamePrefix;
         }
         
         
